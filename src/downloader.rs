@@ -101,6 +101,8 @@ impl QbitDownloader {
         save_name: &str,
     ) -> Result<(), BoxErr> {
         self.client.torrents_add_by_file(&[file_path]).await?;
+        // wait for the torrent to be added
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
         self.move_files(hash, save_dir, save_name).await?;
         Ok(())
     }
