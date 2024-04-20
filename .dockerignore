@@ -1,0 +1,9 @@
+/target
+posters
+.DS_Store
+.stfolder
+.stignore
+.env
+tmp
+*.db
+*.db.wal
