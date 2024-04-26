@@ -17,13 +17,13 @@ pub enum Command {
     List,
     #[command(description = "get bangumi info.\nUsage: /info <id>")]
     Info(u32),
-    #[command(description = "add a bangumi via rss url.\nUsage: /add <url>")]
+    #[command(description = "add a bangumi.\nUsage: /add <rss_url>")]
     Add(String),
-    #[command(description = "remove a bangumi by id.\nUsage: /remove <id>")]
+    #[command(description = "remove a bangumi.\nUsage: /remove <id>")]
     Remove(u32),
-    #[command(description = "enable rss by id.\nUsage: /enable <id>")]
+    #[command(description = "enable rss.\nUsage: /enable <id>")]
     Enable(u32),
-    #[command(description = "disable rss by id.\nUsage: /disable <id>")]
+    #[command(description = "disable rss.\nUsage: /disable <id>")]
     Disable(u32),
     #[command(
         description = "set not contains words by id.\nUsage: /nc <id> <word1,word2,...>/none",
@@ -33,7 +33,7 @@ pub enum Command {
     NotContains(u32, String),
 }
 
-pub struct BotConfig {
+pub struct Config {
     pub proxy: Option<reqwest::Proxy>,
     pub user_ids: Vec<u64>,
     pub not_contains: Vec<String>,
@@ -47,12 +47,12 @@ pub struct MyBot {
 }
 
 impl MyBot {
-    pub async fn new(config: Arc<BotConfig>, db: Arc<database::Client>) -> Result<Self> {
+    pub async fn new(config: Arc<Config>, db: Arc<database::Client>) -> Result<Self> {
         let tg = Arc::new(Bot::from_env());
         tg.set_my_commands(Command::bot_commands()).await?;
 
         let handler = Update::filter_message().branch(
-            dptree::filter(|msg: Message, config: Arc<BotConfig>| {
+            dptree::filter(|msg: Message, config: Arc<Config>| {
                 msg.from()
                     .map(|user| config.user_ids.contains(&user.id.0))
                     .unwrap_or_default()
@@ -96,7 +96,7 @@ pub async fn bot_handler(
     msg: Message,
     bot: Arc<Bot>,
     cmd: Command,
-    config: Arc<BotConfig>,
+    config: Arc<Config>,
     db: Arc<database::Client>,
 ) -> Result<()> {
     let chat_id = msg.chat.id;
@@ -110,7 +110,7 @@ pub async fn bot_handler(
         Command::Info(id) => handler.bangumi_info(id).await?,
         Command::Enable(id) => handler.bangumi_enable(id).await?,
         Command::Disable(id) => handler.bangumi_disable(id).await?,
-        Command::NotContains(id, words) => handler.bangumi_not_contains(id, words).await?
+        Command::NotContains(id, words) => handler.bangumi_not_contains(id, words).await?,
     };
     Ok(())
 }
@@ -118,7 +118,7 @@ pub async fn bot_handler(
 pub struct BotHandler {
     pub bot: Arc<Bot>,
     pub chat_id: ChatId,
-    pub config: Arc<BotConfig>,
+    pub config: Arc<Config>,
     pub db: Arc<database::Client>,
 }
 
@@ -126,7 +126,7 @@ impl BotHandler {
     pub fn new(
         bot: Arc<Bot>,
         chat_id: ChatId,
-        config: Arc<BotConfig>,
+        config: Arc<Config>,
         db: Arc<database::Client>,
     ) -> Self {
         BotHandler {
@@ -137,7 +137,9 @@ impl BotHandler {
         }
     }
     pub async fn bot_help(&self) -> Result<()> {
-        self.bot.send_message(self.chat_id, Command::descriptions().to_string()).await?;
+        self.bot
+            .send_message(self.chat_id, Command::descriptions().to_string())
+            .await?;
         Ok(())
     }
     pub async fn bangumi_list(&self) -> Result<()> {
@@ -159,9 +161,7 @@ impl BotHandler {
                 .map(|b| format!("{}\n{}\n", b.id, b.title))
                 .collect::<Vec<String>>()
                 .join("\n");
-            self.bot
-                .send_message(self.chat_id, text)
-                .await?;
+            self.bot.send_message(self.chat_id, text).await?;
         }
         Ok(())
     }
@@ -198,8 +198,11 @@ impl BotHandler {
                 match self.db.insert_bangumi(bangumi) {
                     Ok(_) => {
                         utils::ensure_dir(&self.config.tmp_dir).await?;
-                        let poster_path =
-                            format!("{}/{}", self.config.tmp_dir, b.poster_url.split('/').last().unwrap());
+                        let poster_path = format!(
+                            "{}/{}",
+                            self.config.tmp_dir,
+                            b.poster_url.split('/').last().unwrap()
+                        );
                         utils::download_file(
                             &b.poster_url,
                             &poster_path,
@@ -208,7 +211,9 @@ impl BotHandler {
                         .await?;
                         let poster_file = InputFile::file(poster_path);
                         self.bot.send_photo(self.chat_id, poster_file).await?;
-                        self.bot.send_message(self.chat_id, format!("{}\n{}", b.id, b.title)).await?;
+                        self.bot
+                            .send_message(self.chat_id, format!("{}\n{}", b.id, b.title))
+                            .await?;
                         self.bot.send_message(self.chat_id, "Success.").await?;
                     }
                     Err(e) => {
@@ -246,7 +251,9 @@ impl BotHandler {
                     );
                     self.bot.send_message(self.chat_id, text).await?;
                 } else {
-                    self.bot.send_message(self.chat_id, "Bangumi not found.").await?;
+                    self.bot
+                        .send_message(self.chat_id, "Bangumi not found.")
+                        .await?;
                 }
             }
             Err(e) => {
