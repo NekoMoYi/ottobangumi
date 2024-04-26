@@ -246,8 +246,8 @@ impl BotHandler {
             Ok(b) => {
                 if let Some(b) = b {
                     let text = format!(
-                        "id: {}\ntitle: {}\nweekday: {}\nposter: {}\nurl: {}\nenabled: {}\nnot contains: {:?}",
-                        b.id, b.title, b.weekday, b.poster_url, b.rss_url, b.enabled, b.not_contains
+                        "id: {}\ntitle: {}\nweekday: {}\nposter: {}\nurl: {}\nenabled: {}\nnot contains: {:?}\ndownloaded: {}",
+                        b.id, b.title, b.weekday, b.poster_url, b.rss_url, b.enabled, b.not_contains, b.downloaded.len()
                     );
                     self.bot.send_message(self.chat_id, text).await?;
                 } else {
